@@ -1,14 +1,18 @@
-name: Download file and commit
+name: Download file (zip or apt) and commit
 
 on:
   workflow_dispatch:
     inputs:
       file_url:
-        description: "لینک فایلی که می‌خواهی دانلود شود"
+        description: "لینک فایل مورد نظر"
         required: true
-      output_path:
-        description: "مسیر ذخیره در ریپازیتوری (مثل: data/file.deb)"
+      file_type:
+        description: "نوع فایل (zip یا apt)"
         required: true
+        type: choice
+        options:
+          - zip
+          - apt
 
 permissions:
   contents: write
@@ -25,16 +29,35 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
+      - name: Extract filename and set output paths
+        id: vars
+        run: |
+          URL="${{ github.event.inputs.file_url }}"
+          TYPE="${{ github.event.inputs.file_type }}"
+
+          FILENAME=$(basename "$URL")
+
+          if [ "$TYPE" = "zip" ]; then
+            OUTDIR="zipfiles"
+          else
+            OUTDIR="aptfiles"
+          fi
+
+          mkdir -p "$OUTDIR"
+
+          echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
+          echo "OUTDIR=$OUTDIR" >> $GITHUB_OUTPUT
+          echo "FULLPATH=$OUTDIR/$FILENAME" >> $GITHUB_OUTPUT
+
       - name: Download file
         run: |
           URL="${{ github.event.inputs.file_url }}"
-          OUT="${{ github.event.inputs.output_path }}"
+          PATHOUT="${{ steps.vars.outputs.FULLPATH }}"
 
-          echo "Downloading $URL ..."
-          mkdir -p "$(dirname "$OUT")"
-          curl -L "$URL" --output "$OUT"
+          echo "Downloading: $URL"
+          curl -L "$URL" -o "$PATHOUT"
 
-          echo "File saved to $OUT"
+          echo "Saved file to $PATHOUT"
 
       - name: Git config
         run: |
@@ -43,16 +66,15 @@ jobs:
 
       - name: Commit if changed
         run: |
-          OUT="${{ github.event.inputs.output_path }}"
+          FILE="${{ steps.vars.outputs.FULLPATH }}"
 
-          if git diff --quiet "$OUT"; then
-            echo "No changes. Nothing to commit."
+          if git diff --quiet "$FILE"; then
+            echo "No changes to commit."
             exit 0
           fi
 
-          git add "$OUT"
-          git commit -m "Downloaded updated file: $OUT"
+          git add "$FILE"
+          git commit -m "Downloaded new ${{ github.event.inputs.file_type }} file: $FILE"
 
       - name: Push changes
-        run: |
-          git push
+        run: git push
