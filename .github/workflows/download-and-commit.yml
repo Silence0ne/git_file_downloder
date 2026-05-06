@@ -1,0 +1,58 @@
+name: Download file and commit
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: "لینک فایلی که می‌خواهی دانلود شود"
+        required: true
+      output_path:
+        description: "مسیر ذخیره در ریپازیتوری (مثل: data/file.deb)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Download file
+        run: |
+          URL="${{ github.event.inputs.file_url }}"
+          OUT="${{ github.event.inputs.output_path }}"
+
+          echo "Downloading $URL ..."
+          mkdir -p "$(dirname "$OUT")"
+          curl -L "$URL" --output "$OUT"
+
+          echo "File saved to $OUT"
+
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit if changed
+        run: |
+          OUT="${{ github.event.inputs.output_path }}"
+
+          if git diff --quiet "$OUT"; then
+            echo "No changes. Nothing to commit."
+            exit 0
+          fi
+
+          git add "$OUT"
+          git commit -m "Downloaded updated file: $OUT"
+
+      - name: Push changes
+        run: |
+          git push
