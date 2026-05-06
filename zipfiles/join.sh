@@ -2,8 +2,8 @@
 # Join script for: BASENAME.EXT
 # Usage: bash join.sh
 
-BASENAME="webmin-2.630.tar"
-EXT="gz"
+BASENAME="webmin_2.630_all"
+EXT="deb"
 
 echo "🔗 Joining chunks..."
 cat "${BASENAME}.part_"* > "${BASENAME}.${EXT}"
