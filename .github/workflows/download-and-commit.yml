@@ -1,18 +1,20 @@
-name: Download file (zip or apt) and commit
+name: Download by Type (zip/apt) and Commit
 
 on:
   workflow_dispatch:
     inputs:
       file_url:
-        description: "لینک فایل مورد نظر"
+        description: "🔗 لینک فایل"
         required: true
+        type: string
       file_type:
-        description: "نوع فایل (zip یا apt)"
+        description: "📦 نوع فایل"
         required: true
         type: choice
         options:
           - zip
           - apt
+        default: zip
 
 permissions:
   contents: write
@@ -22,59 +24,73 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
-          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
-      - name: Extract filename and set output paths
-        id: vars
+      - name: Prepare paths
+        id: prep
         run: |
           URL="${{ github.event.inputs.file_url }}"
           TYPE="${{ github.event.inputs.file_type }}"
-
-          FILENAME=$(basename "$URL")
+          NAME=$(basename "$URL")
 
           if [ "$TYPE" = "zip" ]; then
-            OUTDIR="zipfiles"
+            DIR="zipfiles"
           else
-            OUTDIR="aptfiles"
+            DIR="aptfiles"
           fi
 
-          mkdir -p "$OUTDIR"
-
-          echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
-          echo "OUTDIR=$OUTDIR" >> $GITHUB_OUTPUT
-          echo "FULLPATH=$OUTDIR/$FILENAME" >> $GITHUB_OUTPUT
+          mkdir -p "$DIR"
+          
+          echo "FILENAME=$NAME" >> $GITHUB_OUTPUT
+          echo "OUTDIR=$DIR" >> $GITHUB_OUTPUT
+          echo "FULLPATH=$DIR/$NAME" >> $GITHUB_OUTPUT
 
       - name: Download file
         run: |
           URL="${{ github.event.inputs.file_url }}"
-          PATHOUT="${{ steps.vars.outputs.FULLPATH }}"
+          OUT="${{ steps.prep.outputs.FULLPATH }}"
 
           echo "Downloading: $URL"
-          curl -L "$URL" -o "$PATHOUT"
+          curl -L "$URL" -o "$OUT"
 
-          echo "Saved file to $PATHOUT"
+          echo "Saved to $OUT"
 
-      - name: Git config
+      - name: Commit & Push
         run: |
+          echo "📦 Preparing commit and push..."
+
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "bot@github.com"
 
-      - name: Commit if changed
-        run: |
-          FILE="${{ steps.vars.outputs.FULLPATH }}"
+          echo "📁 Adding all changed files..."
+          git add -A
 
-          if git diff --quiet "$FILE"; then
-            echo "No changes to commit."
+          CHANGES=$(git diff --cached --name-only | wc -l)
+
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "❌ No new changes"
             exit 0
           fi
 
-          git add "$FILE"
-          git commit -m "Downloaded new ${{ github.event.inputs.file_type }} file: $FILE"
+          echo "📝 Committing..."
+          git commit -m "Added new ${{ github.event.inputs.file_type }}: ${{ steps.prep.outputs.FILENAME }}" --quiet
 
-      - name: Push changes
-        run: git push
+          echo "🚀 Pushing changes..."
+          # Robust push (same technique from YouTube Downloader)
+          for i in 1 2 3 4 5; do
+            echo -n "Attempt $i/5..."
+            if git pull --rebase --quiet 2>/dev/null && git push --quiet 2>/dev/null; then
+              echo " Success!"
+              exit 0
+            fi
+            echo " Failed."
+            git rebase --abort 2>/dev/null
+            [ $i -lt 5 ] && sleep $((i*3))
+          done
+
+          echo "❌ Push failed after several attempts"
+          exit 1
