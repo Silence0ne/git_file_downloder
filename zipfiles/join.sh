@@ -2,8 +2,8 @@
 # Join script for: BASENAME.EXT
 # Usage: bash join.sh
 
-BASENAME="Hiddify-Android-arm64"
-EXT="apk"
+BASENAME="nextcloud-33.0.3"
+EXT="zip"
 
 echo "🔗 Joining chunks..."
 cat "${BASENAME}.part_"* > "${BASENAME}.${EXT}"
