@@ -2,8 +2,8 @@
 # Join script for: BASENAME.EXT
 # Usage: bash join.sh
 
-BASENAME="nextcloud-33.0.3"
-EXT="zip"
+BASENAME="webmin-2.630.tar"
+EXT="gz"
 
 echo "🔗 Joining chunks..."
 cat "${BASENAME}.part_"* > "${BASENAME}.${EXT}"
