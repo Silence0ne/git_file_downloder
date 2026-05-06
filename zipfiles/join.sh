@@ -2,8 +2,8 @@
 # Join script for: BASENAME.EXT
 # Usage: bash join.sh
 
-BASENAME="Hiddify-Debian-x64"
-EXT="deb"
+BASENAME="Hiddify-Android-arm7"
+EXT="apk"
 
 echo "🔗 Joining chunks..."
 cat "${BASENAME}.part_"* > "${BASENAME}.${EXT}"
